@@ -13,7 +13,9 @@ import { QRCodeCanvas } from 'qrcode.react'
 const Deposit: React.FC = () => {
   const { t } = useI18n()
   const dispatch = useAppDispatch()
-  const { addresses, balances, isLoading, error } = useAppSelector(state => state.wallet)
+  const { addresses, balances, isLoading, error } = useAppSelector(
+    state => state.wallet
+  )
   const [selectedCurrencyType, setSelectedCurrencyType] = useState('Crypto')
   const router = useRouter()
   const pathname = usePathname()
@@ -32,11 +34,16 @@ const Deposit: React.FC = () => {
         },
       ]
     }
-    
+
     return balances.map(balance => ({
       value: balance.currency.toLowerCase(),
       label: balance.currency.toUpperCase(),
-      icon: <img src={`/icons/coin-icon/${balance.currency.toUpperCase()}.svg`} alt="" />,
+      icon: (
+        <img
+          src={`/icons/coin-icon/${balance.currency.toUpperCase()}.svg`}
+          alt=""
+        />
+      ),
     }))
   }, [balances])
 
@@ -64,33 +71,47 @@ const Deposit: React.FC = () => {
         },
       ]
     }
-    
+
     // Create network options based on available blockchains
-    const uniqueBlockchains = [...new Set(addresses.map(addr => addr.blockchain))]
+    const uniqueBlockchains = [
+      ...new Set(addresses.map(addr => addr.blockchain)),
+    ]
     return uniqueBlockchains.map(blockchain => {
       // Map blockchain names to network values and labels
-      const networkValue = blockchain === 'Tron' ? 'trc' :
-                          blockchain === 'Ethereum' ? 'erc' :
-                          blockchain === 'BNB' ? 'bsc' :
-                          blockchain === 'Ton' ? 'ton' :
-                          blockchain === 'Solana' ? 'sol' :
-                          blockchain.toLowerCase().substring(0, 3)
-      
-      const networkLabel = blockchain === 'Tron' ? 'TRC20' :
-                          blockchain === 'Ethereum' ? 'ERC20' :
-                          blockchain === 'BNB' ? 'BEP20' :
-                          blockchain === 'Ton' ? 'TON' :
-                          blockchain === 'Solana' ? 'SOL' :
-                          blockchain.toUpperCase()
-      
+      const networkValue =
+        blockchain === 'Tron'
+          ? 'trc'
+          : blockchain === 'Ethereum'
+            ? 'erc'
+            : blockchain === 'BNB'
+              ? 'bsc'
+              : blockchain === 'Solana'
+                ? 'sol'
+                : blockchain.toLowerCase().substring(0, 3)
+
+      const networkLabel =
+        blockchain === 'Tron'
+          ? 'TRC20'
+          : blockchain === 'Ethereum'
+            ? 'ERC20'
+            : blockchain === 'BNB'
+              ? 'BEP20'
+              : blockchain === 'Solana'
+                ? 'Solana'
+                : blockchain.toUpperCase()
+
       // Map blockchain to appropriate icon
-      const iconName = blockchain === 'Tron' ? 'TRX' :
-                      blockchain === 'Ethereum' ? 'ERC' :
-                      blockchain === 'BNB' ? 'BNB' :
-                      blockchain === 'Ton' ? 'TON' :
-                      blockchain === 'Solana' ? 'SOL' :
-                      'USDT' // fallback
-      
+      const iconName =
+        blockchain === 'Tron'
+          ? 'TRX'
+          : blockchain === 'Ethereum'
+            ? 'ETH'
+            : blockchain === 'BNB'
+              ? 'BNB'
+              : blockchain === 'Solana'
+                ? 'SOL'
+                : 'USDT' // fallback
+
       return {
         value: networkValue,
         label: networkLabel,
@@ -123,19 +144,24 @@ const Deposit: React.FC = () => {
     }
   }, [networkOptions, selectedNetworkValue])
 
-  const networkToBlockchain = useMemo(() => ({
-    trc: 'Tron',
-    erc: 'Ethereum',
-    bsc: 'BNB',
-    ton: 'Ton',
-    sol: 'Solana',
-  } as Record<string, string>), [])
+  const networkToBlockchain = useMemo(
+    () =>
+      ({
+        trc: 'Tron',
+        erc: 'Ethereum',
+        bsc: 'BNB',
+        sol: 'Solana',
+      }) as Record<string, string>,
+    []
+  )
 
   const selectedBlockchain = networkToBlockchain[selectedNetworkValue]
   const selectedPublicKey = useMemo(() => {
     if (!addresses || addresses.length === 0) return ''
     // Find address by matching the blockchain name
-    const entry = addresses.find(a => a.blockchain?.toLowerCase() === selectedBlockchain?.toLowerCase())
+    const entry = addresses.find(
+      a => a.blockchain?.toLowerCase() === selectedBlockchain?.toLowerCase()
+    )
     return entry?.publicKey || ''
   }, [addresses, selectedBlockchain])
 
@@ -148,9 +174,17 @@ const Deposit: React.FC = () => {
       error,
       selectedPublicKey,
       selectedBlockchain,
-      selectedNetworkValue
+      selectedNetworkValue,
     })
-  }, [balances, addresses, isLoading, error, selectedPublicKey, selectedBlockchain, selectedNetworkValue])
+  }, [
+    balances,
+    addresses,
+    isLoading,
+    error,
+    selectedPublicKey,
+    selectedBlockchain,
+    selectedNetworkValue,
+  ])
 
   const selectedFiatBalance = useMemo(() => {
     const code = selectedCurrencyValue?.toUpperCase()
@@ -244,7 +278,7 @@ const Deposit: React.FC = () => {
                   size={125}
                   bgColor="#ffffff"
                   fgColor="#000000"
-                  level="H"           // Error correction level: L, M, Q, H
+                  level="H" // Error correction level: L, M, Q, H
                 />
               </div>
               <div className="flex flex-col justify-between w-full gap-2">
@@ -253,12 +287,17 @@ const Deposit: React.FC = () => {
                 </h2>
                 <div className="bg-white-8 rounded-[8px] w-full min-h-[62px] flex justify-center items-center">
                   <span className="text-casper font-bold break-all p-2 text-[.8rem]">
-                    {isLoading ? t('app.loading') : 
-                     error ? `Error: ${error}` :
-                     selectedPublicKey || t('wallet.address') + ' N/A'}
+                    {isLoading
+                      ? t('app.loading')
+                      : error
+                        ? `Error: ${error}`
+                        : selectedPublicKey || t('wallet.address') + ' N/A'}
                   </span>
                 </div>
-                <button onClick={handleCopy} className="flex bg-white-13 justify-center text-casper text-[1rem] font-bold items-center rounded-[12px] gap-1 h-[48px] w-full">
+                <button
+                  onClick={handleCopy}
+                  className="flex bg-white-13 justify-center text-casper text-[1rem] font-bold items-center rounded-[12px] gap-1 h-[48px] w-full"
+                >
                   <CopyIcon />
                   <span>{t('wallet.copy')}</span>
                 </button>
@@ -283,7 +322,10 @@ const Deposit: React.FC = () => {
               <h2 className="text-[14px] font-bold text-white">
                 <span>{t('wallet.relenishmentMethod')}</span>
               </h2>
-              <div className="text-[12px] text-casper font-bold">Available: {selectedFiatBalance} {selectedCurrencyValue.toUpperCase()}</div>
+              <div className="text-[12px] text-casper font-bold">
+                Available: {selectedFiatBalance}{' '}
+                {selectedCurrencyValue.toUpperCase()}
+              </div>
               <div className="bg-mirage rounded-[12px] h-[48px] p-[6px] grid items-center  grid-cols-[auto_auto_56px] pl-2">
                 <div className="flex justify-center items-center">
                   <img
@@ -343,7 +385,8 @@ const Deposit: React.FC = () => {
                   <span className="text-[14px] font-bold text-gallery">0</span>
                 </div>
                 <div className="flex justify-end  font-bold text-[14px] text-white gap-1 items-center">
-                  pay <span className="text-malachite">+{selectedFiatBalance}</span>
+                  pay{' '}
+                  <span className="text-malachite">+{selectedFiatBalance}</span>
                 </div>
               </div>
             </div>

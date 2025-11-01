@@ -1,13 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { Dropdown, Select } from '@/components/ui'
-import { PiIcon } from 'lucide-react'
 import { DropdownSelect } from '@/components/ui/DropdownSelect'
-import CopyIcon from '@/components/ui/icons/copy'
 import InfoCircleIcon from '@/components/ui/icons/info-circle'
 import TDButton from '@/components/ui/Button/TDButton'
-import { CopyBox } from '@/components/ui/CopyBox'
 import FlatButton from '@/components/ui/Button/FlatButton'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
 import { withdrawCrypto, fetchWalletInfo } from '@/store/slices/walletSlice'
@@ -16,7 +12,9 @@ import { useToast } from '@/context/ToastProvider'
 const Withdraw: React.FC = () => {
   const [selectedCurrencyType, setSelectedCurrencyType] = useState('Crypto')
   const dispatch = useAppDispatch()
-  const { addresses, balances, isLoading, error } = useAppSelector(state => state.wallet)
+  const { addresses, balances, isLoading } = useAppSelector(
+    state => state.wallet
+  )
   const { showSuccess, showError } = useToast()
   const router = useRouter()
   const pathname = usePathname()
@@ -33,13 +31,15 @@ const Withdraw: React.FC = () => {
     USDT: { min: 1, max: 10000, fee: 1 },
     BTC: { min: 0.001, max: 10, fee: 0.0005 },
     ETH: { min: 0.01, max: 100, fee: 0.005 },
+    TRX: { min: 1, max: 10000, fee: 1 },
     SOL: { min: 0.01, max: 100, fee: 0.005 },
     USDC: { min: 1, max: 10000, fee: 1 },
+    BNB: { min: 0.01, max: 100, fee: 0.005 },
   } as Record<string, { min: number; max: number; fee: number }>
 
   // Currency options based on selected network
-  const getCurrencyOptions = () => {
-    if (selectedNetworkValue === 'solana') {
+  const currencyOptions = useMemo(() => {
+    if (selectedNetworkValue === 'sol' || selectedNetworkValue === 'solana') {
       return [
         {
           value: 'sol',
@@ -55,13 +55,43 @@ const Withdraw: React.FC = () => {
     } else if (selectedNetworkValue === 'trc') {
       return [
         {
+          value: 'trx',
+          label: 'TRX',
+          icon: <img src="/icons/coin-icon/TRX.svg" />,
+        },
+        {
+          value: 'usdt',
+          label: 'USDT',
+          icon: <img src="/icons/coin-icon/USDT.svg" />,
+        },
+      ]
+    } else if (selectedNetworkValue === 'erc') {
+      return [
+        {
+          value: 'eth',
+          label: 'ETH',
+          icon: <img src="/icons/coin-icon/ETH.svg" />,
+        },
+        {
+          value: 'usdt',
+          label: 'USDT',
+          icon: <img src="/icons/coin-icon/USDT.svg" />,
+        },
+      ]
+    } else if (selectedNetworkValue === 'bsc') {
+      return [
+        {
+          value: 'bnb',
+          label: 'BNB',
+          icon: <img src="/icons/coin-icon/BNB.svg" />,
+        },
+        {
           value: 'usdt',
           label: 'USDT',
           icon: <img src="/icons/coin-icon/USDT.svg" />,
         },
       ]
     } else {
-      // Ethereum network
       return [
         {
           value: 'usdt',
@@ -70,9 +100,7 @@ const Withdraw: React.FC = () => {
         },
       ]
     }
-  }
-
-  const currencyOptions = getCurrencyOptions()
+  }, [selectedNetworkValue])
 
   const currencyOptions1 = [
     {
@@ -84,27 +112,82 @@ const Withdraw: React.FC = () => {
     },
   ]
 
-  const networkOptions = [
-    {
-      value: 'trc',
-      label: 'TRC20',
-      icon: <img src="/icons/coin-icon/TRX.svg" />,
-    },
-    {
-      value: 'solana',
-      label: 'Solana',
-      icon: <img src="/icons/coin-icon/SOL.svg" />,
-    },
-  ]
+  const networkOptions = useMemo(() => {
+    if (!addresses || addresses.length === 0) {
+      return [
+        {
+          value: 'trc',
+          label: 'TRC20',
+          icon: <img src="/icons/coin-icon/TRX.svg" />,
+        },
+        {
+          value: 'sol',
+          label: 'Solana',
+          icon: <img src="/icons/coin-icon/SOL.svg" />,
+        },
+      ]
+    }
+
+    // Create network options based on available blockchains
+    const uniqueBlockchains = [
+      ...new Set(addresses.map(addr => addr.blockchain)),
+    ]
+    return uniqueBlockchains.map(blockchain => {
+      const networkValue =
+        blockchain === 'Tron'
+          ? 'trc'
+          : blockchain === 'Ethereum'
+            ? 'erc'
+            : blockchain === 'BNB'
+              ? 'bsc'
+              : blockchain === 'Solana'
+                ? 'sol'
+                : blockchain.toLowerCase().substring(0, 3)
+
+      const networkLabel =
+        blockchain === 'Tron'
+          ? 'TRC20'
+          : blockchain === 'Ethereum'
+            ? 'ERC20'
+            : blockchain === 'BNB'
+              ? 'BEP20'
+              : blockchain === 'Solana'
+                ? 'Solana'
+                : blockchain.toUpperCase()
+
+      const iconName =
+        blockchain === 'Tron'
+          ? 'TRX'
+          : blockchain === 'Ethereum'
+            ? 'ETH'
+            : blockchain === 'BNB'
+              ? 'BNB'
+              : blockchain === 'Solana'
+                ? 'SOL'
+                : 'USDT'
+
+      return {
+        value: networkValue,
+        label: networkLabel,
+        icon: <img src={`/icons/coin-icon/${iconName}.svg`} />,
+      }
+    })
+  }, [addresses])
 
   // Computed values
   const selectedCurrency = selectedValue.toUpperCase()
   const availableBalance = useMemo(() => {
-    const balance = balances?.find(b => b.currency.toUpperCase() === selectedCurrency)
+    const balance = balances?.find(
+      b => b.currency.toUpperCase() === selectedCurrency
+    )
     return balance?.amount || 0
   }, [balances, selectedCurrency])
 
-  const withdrawalLimits = WITHDRAWAL_LIMITS[selectedCurrency] || { min: 1, max: 1000, fee: 0.1 }
+  const withdrawalLimits = WITHDRAWAL_LIMITS[selectedCurrency] || {
+    min: 1,
+    max: 1000,
+    fee: 0.1,
+  }
   const withdrawalFee = withdrawalLimits.fee
   const maxWithdrawable = Math.max(0, availableBalance - withdrawalFee)
   const withdrawalAmount = typeof amount === 'number' ? amount : 0
@@ -112,9 +195,10 @@ const Withdraw: React.FC = () => {
   const actualReceived = Math.max(0, withdrawalAmount - withdrawalFee)
 
   // Validation
-  const isValidAmount = withdrawalAmount >= withdrawalLimits.min && 
-                       withdrawalAmount <= withdrawalLimits.max && 
-                       totalDeduction <= availableBalance
+  const isValidAmount =
+    withdrawalAmount >= withdrawalLimits.min &&
+    withdrawalAmount <= withdrawalLimits.max &&
+    totalDeduction <= availableBalance
   const isValidAddress = toAddress.trim().length > 0
   const isValidPassword = withdrawalPassword.trim().length > 0
 
@@ -125,11 +209,20 @@ const Withdraw: React.FC = () => {
     }
     if (!isValidAmount) {
       if (withdrawalAmount < withdrawalLimits.min) {
-        showError('Error', `Minimum withdrawal amount is ${withdrawalLimits.min} ${selectedCurrency}`)
+        showError(
+          'Error',
+          `Minimum withdrawal amount is ${withdrawalLimits.min} ${selectedCurrency}`
+        )
       } else if (withdrawalAmount > withdrawalLimits.max) {
-        showError('Error', `Maximum withdrawal amount is ${withdrawalLimits.max} ${selectedCurrency}`)
+        showError(
+          'Error',
+          `Maximum withdrawal amount is ${withdrawalLimits.max} ${selectedCurrency}`
+        )
       } else if (totalDeduction > availableBalance) {
-        showError('Error', `Insufficient balance. Available: ${availableBalance} ${selectedCurrency}`)
+        showError(
+          'Error',
+          `Insufficient balance. Available: ${availableBalance} ${selectedCurrency}`
+        )
       }
       return
     }
@@ -138,8 +231,18 @@ const Withdraw: React.FC = () => {
       return
     }
 
-    const blockchain = selectedNetworkValue === 'trc' ? 'Tron' : 
-                      selectedNetworkValue === 'solana' ? 'Solana' : 'Ethereum'
+    const blockchain =
+      selectedNetworkValue === 'trc'
+        ? 'Tron'
+        : selectedNetworkValue === 'sol'
+          ? 'Solana'
+          : selectedNetworkValue === 'solana'
+            ? 'Solana'
+            : selectedNetworkValue === 'erc'
+              ? 'Ethereum'
+              : selectedNetworkValue === 'bsc'
+                ? 'BNB'
+                : 'Ethereum'
     dispatch(
       withdrawCrypto({
         blockchain,
@@ -148,21 +251,25 @@ const Withdraw: React.FC = () => {
         amount: withdrawalAmount,
         withdrawalPassword: withdrawalPassword,
       })
-    ).unwrap()
-    .then(() => {
-      showSuccess('Success', 'Withdrawal request submitted successfully')
-      setAmount('')
-      setToAddress('')
-      setWithdrawalPassword('')
-      dispatch(fetchWalletInfo()) // Refresh balance
-    })
-    .catch((err: any) => {
-      showError('Error', err || 'Withdrawal failed')
-    })
+    )
+      .unwrap()
+      .then(() => {
+        showSuccess('Success', 'Withdrawal request submitted successfully')
+        setAmount('')
+        setToAddress('')
+        setWithdrawalPassword('')
+        dispatch(fetchWalletInfo()) // Refresh balance
+      })
+      .catch((err: any) => {
+        showError('Error', err || 'Withdrawal failed')
+      })
   }
 
   const handleQuickAmount = (percentage: number) => {
-    const quickAmount = percentage === 100 ? maxWithdrawable : (maxWithdrawable * percentage / 100)
+    const quickAmount =
+      percentage === 100
+        ? maxWithdrawable
+        : (maxWithdrawable * percentage) / 100
     setAmount(Math.max(0, Number(quickAmount.toFixed(6))))
   }
 
@@ -267,43 +374,53 @@ const Withdraw: React.FC = () => {
                 Wallet Address{' '}
                 <span className="text-dodger-blue">Address book</span>
               </h2>
-              <input value={toAddress} onChange={e => setToAddress(e.target.value)} placeholder="Destination address" className="px-4 h-[47px] flex items-center bg-white-8 rounded-[0.5rem] text-casper font-bold text-[0.75rem]" />
+              <input
+                value={toAddress}
+                onChange={e => setToAddress(e.target.value)}
+                placeholder="Destination address"
+                className="px-4 h-[47px] flex items-center bg-white-8 rounded-[0.5rem] text-casper font-bold text-[0.75rem]"
+              />
             </div>
 
             <div className="p-4 flex gap-4 rounded-[0.75rem] bg-white-4 flex-col">
               <h2 className="font-bold text-[0.875rem] text-white flex items-center justify-between indent-[1.25rem]">
                 Withdrawal account
                 <span>
-                  Minimum <span className="text-crimson">{withdrawalLimits.min} {selectedCurrency}</span>
+                  Minimum{' '}
+                  <span className="text-crimson">
+                    {withdrawalLimits.min} {selectedCurrency}
+                  </span>
                 </span>
               </h2>
               <input
                 value={amount}
-                onChange={e => setAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                onChange={e =>
+                  setAmount(e.target.value === '' ? '' : Number(e.target.value))
+                }
                 placeholder="Amount"
                 className="px-4 h-[47px] flex items-center bg-white-8 rounded-[0.5rem] text-casper font-bold text-[0.75rem]"
               />
 
               <div className="grid grid-cols-4 h-[47px] items-center  gap-4 font-bold text-[0.75rem]">
-                <div 
+                <div
                   onClick={() => handleQuickAmount(withdrawalLimits.min)}
                   className="text-casper text-[0.75rem] font-bold h-full flex items-center justify-center bg-white-8 rounded-[0.5rem] cursor-pointer hover:bg-white-13 transition-colors"
                 >
                   Lowest
                 </div>
-                <div 
+                <div
                   onClick={() => handleQuickAmount(25)}
                   className="text-casper text-[0.75rem] font-bold h-full flex items-center justify-center bg-white-8 rounded-[0.5rem] cursor-pointer hover:bg-white-13 transition-colors"
                 >
                   25%
                 </div>
-                <div 
+                <div
                   onClick={() => handleQuickAmount(50)}
                   className="text-casper text-[0.75rem] font-bold h-full flex items-center justify-center bg-white-8 rounded-[0.5rem] cursor-pointer hover:bg-white-13 transition-colors"
                 >
                   50%
                 </div>
-                <div 
+                <div
                   onClick={() => handleQuickAmount(100)}
                   className="text-casper text-[0.75rem] font-bold h-full flex items-center justify-center bg-white-8 rounded-[0.5rem] cursor-pointer hover:bg-white-13 transition-colors"
                 >
@@ -316,12 +433,12 @@ const Withdraw: React.FC = () => {
               <h2 className="font-bold text-[0.875rem] text-white indent-[1.25rem]">
                 Withdrawal Password
               </h2>
-              <input 
+              <input
                 type="password"
-                value={withdrawalPassword} 
-                onChange={e => setWithdrawalPassword(e.target.value)} 
-                placeholder="Enter your withdrawal password" 
-                className="px-4 h-[47px] flex items-center bg-white-8 rounded-[0.5rem] text-casper font-bold text-[0.75rem]" 
+                value={withdrawalPassword}
+                onChange={e => setWithdrawalPassword(e.target.value)}
+                placeholder="Enter your withdrawal password"
+                className="px-4 h-[47px] flex items-center bg-white-8 rounded-[0.5rem] text-casper font-bold text-[0.75rem]"
               />
               <div className="text-casper text-[0.75rem]">
                 Enter your withdrawal password for security verification.
@@ -331,7 +448,9 @@ const Withdraw: React.FC = () => {
             <div className="">
               <span className="font-middle text-casper h-[47px] flex border-b border-white-8 items-center gap-1">
                 Available{' '}
-                <span className="font-bold text-white">{availableBalance.toFixed(6)} {selectedCurrency}</span>
+                <span className="font-bold text-white">
+                  {availableBalance.toFixed(6)} {selectedCurrency}
+                </span>
               </span>
               <div className="flex justify-between py-2 items-center">
                 <span className="text-dodger-blue font-medium text-[0.75rem]">
@@ -359,17 +478,25 @@ const Withdraw: React.FC = () => {
               </div>
               {!isValidAmount && withdrawalAmount > 0 && (
                 <div className="text-yellow-orange text-[0.75rem] font-medium py-2">
-                  {withdrawalAmount < withdrawalLimits.min && `Minimum withdrawal: ${withdrawalLimits.min} ${selectedCurrency}`}
-                  {withdrawalAmount > withdrawalLimits.max && `Maximum withdrawal: ${withdrawalLimits.max} ${selectedCurrency}`}
-                  {totalDeduction > availableBalance && 'Insufficient balance (including fees)'}
+                  {withdrawalAmount < withdrawalLimits.min &&
+                    `Minimum withdrawal: ${withdrawalLimits.min} ${selectedCurrency}`}
+                  {withdrawalAmount > withdrawalLimits.max &&
+                    `Maximum withdrawal: ${withdrawalLimits.max} ${selectedCurrency}`}
+                  {totalDeduction > availableBalance &&
+                    'Insufficient balance (including fees)'}
                 </div>
               )}
             </div>
             <div className="flex flex-col gap-4">
-              <FlatButton 
-                onClick={handleWithdraw} 
-                disabled={!isValidAmount || !isValidAddress || !isValidPassword || isLoading}
-                className={`h-9 w-full text-[0.75rem] font-bold text-gallery ${(!isValidAmount || !isValidAddress || !isValidPassword || isLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
+              <FlatButton
+                onClick={handleWithdraw}
+                disabled={
+                  !isValidAmount ||
+                  !isValidAddress ||
+                  !isValidPassword ||
+                  isLoading
+                }
+                className={`h-9 w-full text-[0.75rem] font-bold text-gallery ${!isValidAmount || !isValidAddress || !isValidPassword || isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {isLoading ? 'Processing...' : 'Withdraw money'}
               </FlatButton>
