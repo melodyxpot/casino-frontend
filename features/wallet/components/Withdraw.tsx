@@ -293,10 +293,11 @@ const Withdraw: React.FC = () => {
 
   // Reset currency when network changes
   useEffect(() => {
-    const availableCurrencies = getCurrencyOptions()
-    if (availableCurrencies.length > 0) {
-      setSelectedValue(availableCurrencies[0].value)
-    }
+    //! TODO
+    // const availableCurrencies = getCurrencyOptions()
+    // if (availableCurrencies.length > 0) {
+    //   setSelectedValue(availableCurrencies[0].value)
+    // }
   }, [selectedNetworkValue])
 
   const handleCurrencyTypeClick = (gameType: string) => {
