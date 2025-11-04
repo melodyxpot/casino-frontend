@@ -1,6 +1,11 @@
 import React from 'react'
 import { store } from '@/store'
-import { setLocale, setTranslations, setLoading, setError, clearTranslations } from '@/store/slices/i18nSlice'
+import {
+  setLocale,
+  setTranslations,
+  setLoading,
+  setError,
+} from '@/store/slices/i18nSlice'
 
 export type Locale =
   | 'en'
@@ -103,7 +108,7 @@ class I18nManager {
   private async loadLocale(locale: Locale): Promise<void> {
     try {
       store.dispatch(setLoading(true))
-      
+
       // Check if we're in a browser environment
       if (typeof window === 'undefined') {
         // Server-side: use require for static files
@@ -169,7 +174,7 @@ class I18nManager {
   t(key: string, params?: Record<string, string | number>): string {
     const state = store.getState()
     const translations = state.i18n.translations
-    
+
     const keys = key.split('.')
     let value: any = translations
 
@@ -216,7 +221,7 @@ class I18nManager {
   hasKey(key: string): boolean {
     const state = store.getState()
     const translations = state.i18n.translations
-    
+
     const keys = key.split('.')
     let value: any = translations
 
