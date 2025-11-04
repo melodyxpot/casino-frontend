@@ -370,7 +370,7 @@ export default function AuthModal() {
     setIsTelegramLoading(true)
     
     // Redirect to Telegram login widget
-    const telegramLoginUrl = `https://oauth.telegram.org/auth?bot_id=8335171732&origin=${encodeURIComponent(window.location.origin)}&return_to=${encodeURIComponent('https://api.ok777.io/auth/telegram/callback')}`
+    const telegramLoginUrl = `https://oauth.telegram.org/auth?bot_id=8335171732&origin=${encodeURIComponent(window.location.origin)}&return_to=${encodeURIComponent(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? 'https://api.ok777.io'}/auth/telegram/callback`)}`
     window.location.href = telegramLoginUrl
   }
 

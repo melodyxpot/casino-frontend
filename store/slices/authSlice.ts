@@ -1,11 +1,10 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
-import { 
-  SignupRequest, 
-  SignupResponse, 
-  LoginRequest, 
-  LoginResponse, 
-  User, 
-  ApiError,
+import {
+  SignupRequest,
+  SignupResponse,
+  LoginRequest,
+  LoginResponse,
+  User,
   API_BASE_URL,
   API_ENDPOINTS,
   ProfileResponse,
@@ -23,7 +22,7 @@ import {
   ChangePasswordResponse,
   SetPasswordRequest,
   SetPasswordResponse,
-  SetNameRequest
+  SetNameRequest,
 } from '../../types/api'
 import { apiService } from '../../lib/api'
 import { setAuthToken as setAuthTokenEvent } from '../../lib/auth'
@@ -41,6 +40,7 @@ interface AuthState {
   signupStatus: 'idle' | 'loading' | 'succeeded' | 'failed'
   loginStatus: 'idle' | 'loading' | 'succeeded' | 'failed'
   tonAuthStatus: 'idle' | 'loading' | 'succeeded' | 'failed'
+  hasPassword: boolean
 }
 
 // Initial State
@@ -53,15 +53,16 @@ const initialState: AuthState = {
   signupStatus: 'idle',
   loginStatus: 'idle',
   tonAuthStatus: 'idle',
+  hasPassword: false,
 }
 
 // Load auth state from localStorage
 const loadAuthState = (): Partial<AuthState> => {
   if (typeof window === 'undefined') return {}
-  
+
   try {
     const savedToken = localStorage.getItem('auth_token')
-    
+
     if (savedToken) {
       // Set cookie when loading from localStorage
       setAuthCookie(savedToken)
@@ -73,14 +74,14 @@ const loadAuthState = (): Partial<AuthState> => {
   } catch (error) {
     console.warn('Failed to load auth state from localStorage:', error)
   }
-  
+
   return {}
 }
 
 // Save auth state to localStorage and cookies (only token, not user data)
 const saveAuthState = (token: string) => {
   if (typeof window === 'undefined') return
-  
+
   try {
     localStorage.setItem('auth_token', token)
     setAuthCookie(token) // Set cookie for middleware access
@@ -92,11 +93,11 @@ const saveAuthState = (token: string) => {
 // Clear auth state from localStorage and cookies
 const clearAuthState = () => {
   if (typeof window === 'undefined') return
-  
+
   try {
     localStorage.removeItem('auth_token')
     clearAuthCookie() // Clear cookie for middleware
-    
+
     // Clean up any remaining non-essential localStorage data
     cleanupLocalStorage()
   } catch (error) {
@@ -108,30 +109,32 @@ const clearAuthState = () => {
 // Only use reliable detection methods - provider field and localStorage flags
 const isGoogleOAuthUser = (user: User | null): boolean => {
   if (!user) return false
-  
+
   console.log('isGoogleOAuthUser - Checking user:', {
     id: user.id,
     email: user.email,
     provider: user.provider,
     isVerified: user.isVerified,
-    hasWithdrawPassword: user.hasWithdrawPassword
+    hasWithdrawPassword: user.hasWithdrawPassword,
   })
-  
+
   // PRIMARY DETECTION: Check provider field
   if (user.provider === 'google') {
     console.log('isGoogleOAuthUser - Provider detection: google')
     return true
   }
-  
+
   // SECONDARY DETECTION: Check localStorage flag set during Google OAuth login
   if (typeof window !== 'undefined') {
-    const googleOAuthFlag = localStorage.getItem(`is_google_oauth_user_${user.id}`)
+    const googleOAuthFlag = localStorage.getItem(
+      `is_google_oauth_user_${user.id}`
+    )
     if (googleOAuthFlag === 'true') {
       console.log('isGoogleOAuthUser - localStorage flag detection: true')
       return true
     }
   }
-  
+
   // No fallback detection - only use reliable indicators
   console.log('isGoogleOAuthUser - No Google OAuth indicators found')
   return false
@@ -140,24 +143,30 @@ const isGoogleOAuthUser = (user: User | null): boolean => {
 // Helper function to determine if user should use set-password (no old password) vs change-password (requires old password)
 const shouldUseSetPassword = (user: User | null): boolean => {
   if (!user) return false
-  
+
   // Check if user has a login password by looking at localStorage
   // If they've set a password before, we should require the old password
   if (typeof window !== 'undefined') {
-    const hasSetPasswordBefore = localStorage.getItem(`has_set_login_password_${user.id}`)
+    const hasSetPasswordBefore = localStorage.getItem(
+      `has_set_login_password_${user.id}`
+    )
     if (hasSetPasswordBefore === 'true') {
-      console.log('shouldUseSetPassword - User has set password before, requiring old password')
+      console.log(
+        'shouldUseSetPassword - User has set password before, requiring old password'
+      )
       return false // User has set password before, require old password
     }
   }
-  
+
   // For Google OAuth users who haven't set a password yet, allow setting without old password
   const isGoogleUser = isGoogleOAuthUser(user)
   if (isGoogleUser) {
-    console.log('shouldUseSetPassword - Google OAuth user, allowing set-password (no old password required)')
+    console.log(
+      'shouldUseSetPassword - Google OAuth user, allowing set-password (no old password required)'
+    )
     return true
   }
-  
+
   // For regular email/password users, they should always use change-password
   console.log('shouldUseSetPassword - Regular user, requiring old password')
   return false
@@ -165,29 +174,46 @@ const shouldUseSetPassword = (user: User | null): boolean => {
 
 // Helper function to determine if user can set/change withdrawal password
 // Withdrawal password requires login password to exist
-const canSetWithdrawalPassword = (user: User | null): boolean => {
-  if (!user) return false
-  
-  // Check if user has a login password by looking at localStorage
-  if (typeof window !== 'undefined') {
-    const hasSetPasswordBefore = localStorage.getItem(`has_set_login_password_${user.id}`)
-    if (hasSetPasswordBefore === 'true') {
-      console.log('canSetWithdrawalPassword - User has login password, can set withdrawal password')
-      return true
-    }
-  }
-  
-  // For Google OAuth users, check if they've set a login password
-  const isGoogleUser = isGoogleOAuthUser(user)
-  if (isGoogleUser) {
-    console.log('canSetWithdrawalPassword - Google OAuth user without login password, cannot set withdrawal password')
-    return false
-  }
-  
-  // For regular email/password users, they should be able to set withdrawal password
-  console.log('canSetWithdrawalPassword - Regular user, can set withdrawal password')
-  return true
-}
+// const canSetWithdrawalPassword = (user: User | null): boolean => {
+//   if (!user) return false
+
+//   // First check the hasPassword field from backend (most reliable)
+//   if (user.hasPassword !== undefined) {
+//     console.log(
+//       'canSetWithdrawalPassword - User hasPassword from backend:',
+//       user.hasPassword
+//     )
+//     return user.hasPassword
+//   }
+
+//   // Fallback: Check if user has a login password by looking at localStorage
+//   if (typeof window !== 'undefined') {
+//     const hasSetPasswordBefore = localStorage.getItem(
+//       `has_set_login_password_${user.id}`
+//     )
+//     if (hasSetPasswordBefore === 'true') {
+//       console.log(
+//         'canSetWithdrawalPassword - User has login password from localStorage'
+//       )
+//       return true
+//     }
+//   }
+
+//   // For Google OAuth users without hasPassword field, check if they've set a login password
+//   const isGoogleUser = isGoogleOAuthUser(user)
+//   if (isGoogleUser) {
+//     console.log(
+//       'canSetWithdrawalPassword - Google OAuth user without login password'
+//     )
+//     return false
+//   }
+
+//   // For regular email/password users, they should be able to set withdrawal password
+//   console.log(
+//     'canSetWithdrawalPassword - Regular user, can set withdrawal password'
+//   )
+//   return true
+// }
 
 // API Helper Function - Now using ApiService which uses Axios
 const apiRequest = async <T>(
@@ -198,7 +224,7 @@ const apiRequest = async <T>(
   // which internally uses Axios
   const method = config.method || 'GET'
   const headers = config.headers || {}
-  
+
   if (method === 'GET') {
     return apiService.get(endpoint, { headers })
   } else {
@@ -211,61 +237,45 @@ export const signupUser = createAsyncThunk<
   SignupResponse,
   SignupRequest,
   { rejectValue: string }
->(
-  'auth/signupUser',
-  async (signupData, { rejectWithValue }) => {
-    try {
-      const response = await apiRequest<SignupResponse>(
-        API_ENDPOINTS.SIGNUP,
-        {
-          method: 'POST',
-          body: JSON.stringify(signupData),
-        }
-      )
-      return response
-    } catch (error) {
-      console.log('SignupUser thunk catch error:', error, 'Type:', typeof error)
-      const errorMessage = extractErrorMessage(error, 'An error occurred')
-      console.log('Extracted error message:', errorMessage)
-      return rejectWithValue(errorMessage)
-    }
+>('auth/signupUser', async (signupData, { rejectWithValue }) => {
+  try {
+    const response = await apiRequest<SignupResponse>(API_ENDPOINTS.SIGNUP, {
+      method: 'POST',
+      body: JSON.stringify(signupData),
+    })
+    return response
+  } catch (error) {
+    console.log('SignupUser thunk catch error:', error, 'Type:', typeof error)
+    const errorMessage = extractErrorMessage(error, 'An error occurred')
+    console.log('Extracted error message:', errorMessage)
+    return rejectWithValue(errorMessage)
   }
-)
+})
 
 export const loginUser = createAsyncThunk<
   LoginResponse,
   LoginRequest,
   { rejectValue: string }
->(
-  'auth/loginUser',
-  async (loginData, { rejectWithValue }) => {
-    try {
-      const response = await apiRequest<LoginResponse>(
-        API_ENDPOINTS.LOGIN,
-        {
-          method: 'POST',
-          body: JSON.stringify(loginData),
-        }
-      )
-      return response
-    } catch (error) {
-      const errorMessage = extractErrorMessage(error, 'Login failed')
-      return rejectWithValue(errorMessage)
-    }
+>('auth/loginUser', async (loginData, { rejectWithValue }) => {
+  try {
+    const response = await apiRequest<LoginResponse>(API_ENDPOINTS.LOGIN, {
+      method: 'POST',
+      body: JSON.stringify(loginData),
+    })
+    return response
+  } catch (error) {
+    const errorMessage = extractErrorMessage(error, 'Login failed')
+    return rejectWithValue(errorMessage)
   }
-)
+})
 
-export const logoutUser = createAsyncThunk<
-  void,
-  void,
-  { rejectValue: string }
->(
+export const logoutUser = createAsyncThunk<void, void, { rejectValue: string }>(
   'auth/logoutUser',
   async (_, { rejectWithValue, getState }) => {
     try {
       const state = getState() as { auth: AuthState }
       const token = state.auth.token
-      
+
       if (token) {
         await apiRequest(API_ENDPOINTS.LOGOUT, {
           method: 'POST',
@@ -285,35 +295,32 @@ export const refreshToken = createAsyncThunk<
   { token: string; user: User },
   void,
   { rejectValue: string }
->(
-  'auth/refreshToken',
-  async (_, { rejectWithValue, getState }) => {
-    try {
-      const state = getState() as { auth: AuthState }
-      const token = state.auth.token
-      
-      if (!token) {
-        throw new Error('No token available')
-      }
-      
-      const response = await apiRequest<{ token: string; user: User }>(
-        API_ENDPOINTS.REFRESH_TOKEN,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `${token}`,
-          },
-        }
-      )
-      
-      return response
-    } catch (error) {
-      return rejectWithValue(
-        error instanceof Error ? error.message : 'Token refresh failed'
-      )
+>('auth/refreshToken', async (_, { rejectWithValue, getState }) => {
+  try {
+    const state = getState() as { auth: AuthState }
+    const token = state.auth.token
+
+    if (!token) {
+      throw new Error('No token available')
     }
+
+    const response = await apiRequest<{ token: string; user: User }>(
+      API_ENDPOINTS.REFRESH_TOKEN,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `${token}`,
+        },
+      }
+    )
+
+    return response
+  } catch (error) {
+    return rejectWithValue(
+      error instanceof Error ? error.message : 'Token refresh failed'
+    )
   }
-)
+})
 
 // Fetch current profile (requires auth)
 export const fetchProfile = createAsyncThunk<
@@ -325,39 +332,19 @@ export const fetchProfile = createAsyncThunk<
     const state = getState() as { auth: AuthState }
     const token = state.auth.token
     if (!token) throw new Error('Not authenticated')
-    
-    console.log('Making GET request to profile endpoint:', {
-      endpoint: API_ENDPOINTS.PROFILE,
-      token: token ? 'Present' : 'Missing',
+
+    const response = await apiRequest<ProfileResponse>(API_ENDPOINTS.PROFILE, {
       method: 'GET',
-      fullEndpoint: `${API_BASE_URL}${API_ENDPOINTS.PROFILE}`
+      headers: { Authorization: `${token}` },
     })
-    
-    const response = await apiRequest<ProfileResponse>(
-      API_ENDPOINTS.PROFILE,
-      {
-        method: 'GET',
-        headers: { Authorization: `${token}` },
-      }
-    )
-    
-    console.log('Profile API response received:', response)
-    console.log('Response structure check:', {
-      hasCode: 'code' in response,
-      hasMessage: 'message' in response,
-      hasData: 'data' in response,
-      dataContent: response.data,
-      telegramField: response.data?.telegram,
-      hasTelegram: !!response.data?.telegram
-    })
-    
+
     return response
   } catch (error) {
     console.error('Profile API error:', error)
     const errorMessage = extractErrorMessage(error, 'Failed to fetch profile')
     console.error('Error details:', {
       message: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
     })
     return rejectWithValue(errorMessage)
   }
@@ -418,26 +405,32 @@ export const setWithdrawPassword = createAsyncThunk<
   SetWithdrawPasswordResponse,
   SetWithdrawPasswordRequest,
   { rejectValue: string }
->('auth/setWithdrawPassword', async (payload, { rejectWithValue, getState }) => {
-  try {
-    const state = getState() as { auth: AuthState }
-    const token = state.auth.token
-    if (!token) throw new Error('Not authenticated')
-    const response = await apiRequest<SetWithdrawPasswordResponse>(
-      API_ENDPOINTS.SET_WITHDRAW_PASSWORD,
-      {
-        method: 'POST',
-        headers: { Authorization: `${token}` },
-        body: JSON.stringify(payload),
-      }
-    )
-    return response
-  } catch (error) {
-    console.log('setWithdrawPassword error:', error)
-    const errorMessage = extractErrorMessage(error, 'Failed to set withdrawal password')
-    return rejectWithValue(errorMessage)
+>(
+  'auth/setWithdrawPassword',
+  async (payload, { rejectWithValue, getState }) => {
+    try {
+      const state = getState() as { auth: AuthState }
+      const token = state.auth.token
+      if (!token) throw new Error('Not authenticated')
+      const response = await apiRequest<SetWithdrawPasswordResponse>(
+        API_ENDPOINTS.SET_WITHDRAW_PASSWORD,
+        {
+          method: 'POST',
+          headers: { Authorization: `${token}` },
+          body: JSON.stringify(payload),
+        }
+      )
+      return response
+    } catch (error) {
+      console.log('setWithdrawPassword error:', error)
+      const errorMessage = extractErrorMessage(
+        error,
+        'Failed to set withdrawal password'
+      )
+      return rejectWithValue(errorMessage)
+    }
   }
-})
+)
 
 // Set Avatar
 export const setAvatar = createAsyncThunk<
@@ -449,14 +442,14 @@ export const setAvatar = createAsyncThunk<
     const state = getState() as { auth: AuthState }
     const token = state.auth.token
     if (!token) throw new Error('Not authenticated')
-    
+
     const response = await apiRequest<SetAvatarResponse>(
       API_ENDPOINTS.SET_AVATAR,
       {
         method: 'POST',
-        headers: { 
+        headers: {
           Authorization: `${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
       }
@@ -498,26 +491,29 @@ export const changeAccountPassword = createAsyncThunk<
   { code: number; message?: string },
   { password: string; newPassword: string },
   { rejectValue: string }
->('auth/changeAccountPassword', async (payload, { rejectWithValue, getState }) => {
-  try {
-    const state = getState() as { auth: AuthState }
-    const token = state.auth.token
-    if (!token) throw new Error('Not authenticated')
-    const response = await apiRequest<{ code: number; message?: string }>(
-      API_ENDPOINTS.CHANGE_PASSWORD,
-      {
-        method: 'POST',
-        headers: { Authorization: `${token}` },
-        body: JSON.stringify(payload),
-      }
-    )
-    return response
-  } catch (error) {
-    return rejectWithValue(
-      error instanceof Error ? error.message : 'Failed to change password'
-    )
+>(
+  'auth/changeAccountPassword',
+  async (payload, { rejectWithValue, getState }) => {
+    try {
+      const state = getState() as { auth: AuthState }
+      const token = state.auth.token
+      if (!token) throw new Error('Not authenticated')
+      const response = await apiRequest<{ code: number; message?: string }>(
+        API_ENDPOINTS.CHANGE_PASSWORD,
+        {
+          method: 'POST',
+          headers: { Authorization: `${token}` },
+          body: JSON.stringify(payload),
+        }
+      )
+      return response
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error ? error.message : 'Failed to change password'
+      )
+    }
   }
-})
+)
 
 // Set display name
 export const setDisplayName = createAsyncThunk<
@@ -529,16 +525,17 @@ export const setDisplayName = createAsyncThunk<
     const state = getState() as { auth: AuthState }
     const token = state.auth.token
     if (!token) throw new Error('Not authenticated')
-    
+
     const requestPayload: SetNameRequest = { username: payload.name }
-    const response = await apiRequest<{ code: number; message?: string; data?: { name: string } }>(
-      API_ENDPOINTS.SET_NAME,
-      {
-        method: 'POST',
-        headers: { Authorization: `${token}` },
-        body: JSON.stringify(requestPayload),
-      }
-    )
+    const response = await apiRequest<{
+      code: number
+      message?: string
+      data?: { name: string }
+    }>(API_ENDPOINTS.SET_NAME, {
+      method: 'POST',
+      headers: { Authorization: `${token}` },
+      body: JSON.stringify(requestPayload),
+    })
     console.log('setDisplayName response:', response)
     return response
   } catch (error) {
@@ -557,14 +554,15 @@ export const setPhone = createAsyncThunk<
     const state = getState() as { auth: AuthState }
     const token = state.auth.token
     if (!token) throw new Error('Not authenticated')
-    const response = await apiRequest<{ code: number; message?: string; data?: { phone: string } }>(
-      API_ENDPOINTS.SET_PHONE,
-      {
-        method: 'POST',
-        headers: { Authorization: `${token}` },
-        body: JSON.stringify(payload),
-      }
-    )
+    const response = await apiRequest<{
+      code: number
+      message?: string
+      data?: { phone: string }
+    }>(API_ENDPOINTS.SET_PHONE, {
+      method: 'POST',
+      headers: { Authorization: `${token}` },
+      body: JSON.stringify(payload),
+    })
     return response
   } catch (error) {
     return rejectWithValue(
@@ -610,7 +608,7 @@ export const verifyEmailCode = createAsyncThunk<
     const state = getState() as { auth: AuthState }
     const token = state.auth.token
     if (!token) throw new Error('Not authenticated')
-    
+
     const response = await apiRequest<VerifyEmailCodeResponse>(
       API_ENDPOINTS.VERIFY_EMAIL_CODE,
       {
@@ -637,7 +635,7 @@ export const changePassword = createAsyncThunk<
     const state = getState() as { auth: AuthState }
     const token = state.auth.token
     if (!token) throw new Error('Not authenticated')
-    
+
     const response = await apiRequest<ChangePasswordResponse>(
       API_ENDPOINTS.CHANGE_PASSWORD,
       {
@@ -664,7 +662,7 @@ export const setPassword = createAsyncThunk<
     const state = getState() as { auth: AuthState }
     const token = state.auth.token
     if (!token) throw new Error('Not authenticated')
-    
+
     const response = await apiRequest<SetPasswordResponse>(
       API_ENDPOINTS.SET_PASSWORD,
       {
@@ -684,20 +682,25 @@ export const setPassword = createAsyncThunk<
 // TON Wallet Authentication
 export const tonLogin = createAsyncThunk<
   { token: string; user: any },
-  { address: string; signature: string; message: string; walletStateInit?: string },
+  {
+    address: string
+    signature: string
+    message: string
+    walletStateInit?: string
+  },
   { rejectValue: string }
 >('auth/tonLogin', async (payload, { rejectWithValue }) => {
   try {
     // Import TonAuthService dynamically to avoid SSR issues
     const { TonAuthService } = await import('@/lib/tonAuthService')
-    
+
     const response = await TonAuthService.authenticateWithTon(
       payload.address,
       payload.signature,
       payload.message,
       payload.walletStateInit
     )
-    
+
     return response
   } catch (error) {
     return rejectWithValue(
@@ -715,36 +718,39 @@ const authSlice = createSlice({
   },
   reducers: {
     // Clear error
-    clearError: (state) => {
+    clearError: state => {
       state.error = null
     },
-    
+
     // Clear signup status
-    clearSignupStatus: (state) => {
+    clearSignupStatus: state => {
       state.signupStatus = 'idle'
     },
-    
+
     // Clear login status
-    clearLoginStatus: (state) => {
+    clearLoginStatus: state => {
       state.loginStatus = 'idle'
     },
-    
+
     // Clear TON auth status
-    clearTonAuthStatus: (state) => {
+    clearTonAuthStatus: state => {
       state.tonAuthStatus = 'idle'
     },
-    
+
     // Set loading state
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.isLoading = action.payload
     },
-    
+
     // Manual logout (clear state without API call)
-    manualLogout: (state) => {
+    manualLogout: state => {
       // Clear email verification status from localStorage before clearing user
       if (state.user?.id && typeof window !== 'undefined') {
         localStorage.removeItem(`email_verified_${state.user.id}`)
-        console.log('AuthSlice: Cleared email verification status from localStorage for user:', state.user.id)
+        console.log(
+          'AuthSlice: Cleared email verification status from localStorage for user:',
+          state.user.id
+        )
       }
       state.user = null
       state.token = null
@@ -755,7 +761,7 @@ const authSlice = createSlice({
       clearAuthState()
       apiService.removeAuthToken()
     },
-    
+
     // Update user profile
     updateUserProfile: (state, action: PayloadAction<Partial<User>>) => {
       if (state.user) {
@@ -764,10 +770,10 @@ const authSlice = createSlice({
       }
     },
   },
-  extraReducers: (builder) => {
+  extraReducers: builder => {
     // Signup cases
     builder
-      .addCase(signupUser.pending, (state) => {
+      .addCase(signupUser.pending, state => {
         state.isLoading = true
         state.signupStatus = 'loading'
         state.error = null
@@ -776,7 +782,7 @@ const authSlice = createSlice({
         state.isLoading = false
         state.signupStatus = 'succeeded'
         state.error = null
-        
+
         if (action.payload.data) {
           state.user = action.payload.data.user ?? null
           state.token = action.payload.data.token
@@ -793,10 +799,10 @@ const authSlice = createSlice({
         state.signupStatus = 'failed'
         state.error = action.payload || 'Signup failed'
       })
-    
+
     // Login cases
     builder
-      .addCase(loginUser.pending, (state) => {
+      .addCase(loginUser.pending, state => {
         state.isLoading = true
         state.loginStatus = 'loading'
         state.error = null
@@ -805,7 +811,7 @@ const authSlice = createSlice({
         state.isLoading = false
         state.loginStatus = 'succeeded'
         state.error = null
-        
+
         if (action.payload.data) {
           state.user = action.payload.data.user ?? null
           state.token = action.payload.data.token
@@ -822,14 +828,17 @@ const authSlice = createSlice({
         state.loginStatus = 'failed'
         state.error = action.payload || 'Login failed'
       })
-    
+
     // Logout cases
     builder
-      .addCase(logoutUser.fulfilled, (state) => {
+      .addCase(logoutUser.fulfilled, state => {
         // Clear email verification status from localStorage before clearing user
         if (state.user?.id && typeof window !== 'undefined') {
           localStorage.removeItem(`email_verified_${state.user.id}`)
-          console.log('AuthSlice: Cleared email verification status from localStorage for user:', state.user.id)
+          console.log(
+            'AuthSlice: Cleared email verification status from localStorage for user:',
+            state.user.id
+          )
         }
         state.user = null
         state.token = null
@@ -841,7 +850,7 @@ const authSlice = createSlice({
         apiService.removeAuthToken()
         setAuthTokenEvent(null)
       })
-      .addCase(logoutUser.rejected, (state) => {
+      .addCase(logoutUser.rejected, state => {
         // Even if logout fails on server, clear local state
         state.user = null
         state.token = null
@@ -853,7 +862,7 @@ const authSlice = createSlice({
         apiService.removeAuthToken()
         setAuthTokenEvent(null)
       })
-    
+
     // Refresh token cases
     builder
       .addCase(refreshToken.fulfilled, (state, action) => {
@@ -862,7 +871,7 @@ const authSlice = createSlice({
         state.isAuthenticated = true
         saveAuthState(action.payload.token)
       })
-      .addCase(refreshToken.rejected, (state) => {
+      .addCase(refreshToken.rejected, state => {
         state.user = null
         state.token = null
         state.isAuthenticated = false
@@ -871,23 +880,28 @@ const authSlice = createSlice({
 
       // Fetch profile cases
       .addCase(fetchProfile.fulfilled, (state, action) => {
-        console.log('fetchProfile.fulfilled - Received payload:', action.payload)
+        console.log(
+          'fetchProfile.fulfilled - Received payload:',
+          action.payload
+        )
         if (action.payload.data) {
           const p = action.payload.data
           console.log('Profile data to be stored:', p)
           console.log('Telegram field specifically:', {
             telegram: p.telegram,
             hasTelegram: !!p.telegram,
-            telegramType: typeof p.telegram
+            telegramType: typeof p.telegram,
           })
           console.log('Email verification field specifically:', {
             isVerified: p.isVerified,
             hasIsVerified: p.isVerified !== undefined,
-            isVerifiedType: typeof p.isVerified
+            isVerifiedType: typeof p.isVerified,
           })
           // Normalize avatar to absolute URL for consistent rendering across app
           const normalizedAvatar = p.avatar
-            ? (p.avatar.startsWith('/') ? `${API_BASE_URL}${p.avatar}` : p.avatar)
+            ? p.avatar.startsWith('/')
+              ? `${API_BASE_URL}${p.avatar}`
+              : p.avatar
             : undefined
           state.user = {
             id: p.id,
@@ -897,7 +911,11 @@ const authSlice = createSlice({
             telegram: p.telegram,
             avatar: normalizedAvatar,
             isVerified: p.isVerified || p.email_verified, // Handle both field names
-            hasWithdrawPassword: ('withdrawal_password' in (p as Record<string, unknown>)) ? !!(p as any).withdrawal_password : false, // Map if present
+            hasWithdrawPassword:
+              'withdrawal_password' in (p as Record<string, unknown>)
+                ? !!(p as any).withdrawal_password
+                : false, // Map if present
+            hasPassword: p.hasPassword, // Whether user has set a login password
             provider: state.user?.provider, // Preserve provider field from previous state
           }
           // Update stored user if token exists
@@ -911,7 +929,7 @@ const authSlice = createSlice({
         console.log('setTelegram.fulfilled reducer called:', {
           payload: action.payload,
           currentUser: state.user,
-          newTelegram: action.payload.data?.telegram
+          newTelegram: action.payload.data?.telegram,
         })
         if (state.user && action.payload.data?.telegram) {
           state.user = { ...state.user, telegram: action.payload.data.telegram }
@@ -925,10 +943,10 @@ const authSlice = createSlice({
         const data = action.payload?.data
         if (state.user && data?.path) {
           // Construct the full avatar URL
-          const avatarUrl = data.path.startsWith('http') 
-            ? data.path 
+          const avatarUrl = data.path.startsWith('http')
+            ? data.path
             : `${API_BASE_URL}${data.path.startsWith('/') ? '' : '/'}${data.path}`
-          
+
           state.user = { ...state.user, avatar: avatarUrl }
           if (state.token) saveAuthState(state.token)
           console.log('Updated user avatar:', avatarUrl)
@@ -936,15 +954,21 @@ const authSlice = createSlice({
       })
       .addCase(setDisplayName.fulfilled, (state, action) => {
         console.log('setDisplayName.fulfilled:', action.payload)
-        
+
         // Only log success - don't update state locally
         // Fresh data will be fetched from database via fetchProfile
         if (action.payload.code === 200 || action.payload.code === 0) {
-          console.log('Backend confirmed display name update - fresh data will be fetched from database')
+          console.log(
+            'Backend confirmed display name update - fresh data will be fetched from database'
+          )
         } else {
           // Backend returned error - don't update state
-          console.warn('Backend rejected display name update:', action.payload.message)
-          state.error = action.payload.message || 'Failed to update display name'
+          console.warn(
+            'Backend rejected display name update:',
+            action.payload.message
+          )
+          state.error =
+            action.payload.message || 'Failed to update display name'
         }
       })
       .addCase(setDisplayName.rejected, (state, action) => {
@@ -965,18 +989,21 @@ const authSlice = createSlice({
           if (state.token) saveAuthState(state.token)
         }
       })
-      .addCase(googleLogin.pending, (state) => {
+      .addCase(googleLogin.pending, state => {
         state.isLoading = true
         state.error = null
       })
       .addCase(googleLogin.fulfilled, (state, action) => {
         state.isLoading = false
         if (action.payload.data?.token) {
-          console.log('Google OAuth: Setting token in state:', action.payload.data.token.substring(0, 20) + '...')
+          console.log(
+            'Google OAuth: Setting token in state:',
+            action.payload.data.token.substring(0, 20) + '...'
+          )
           state.token = action.payload.data.token
           state.isAuthenticated = true
           apiService.setAuthToken(action.payload.data.token)
-          
+
           // Set provider field for Google OAuth user
           if (state.user) {
             state.user.provider = 'google'
@@ -984,18 +1011,27 @@ const authSlice = createSlice({
           } else {
             // If user is not loaded yet, create a minimal user object with provider
             state.user = { provider: 'google' }
-            console.log('Google OAuth: Created minimal user object with provider "google"')
+            console.log(
+              'Google OAuth: Created minimal user object with provider "google"'
+            )
           }
-          
+
           // Mark this user as a Google OAuth user in localStorage
           if (typeof window !== 'undefined' && state.user?.id) {
-            localStorage.setItem(`is_google_oauth_user_${state.user.id}`, 'true')
-            console.log('Google OAuth: Marked user as Google OAuth user in localStorage')
+            localStorage.setItem(
+              `is_google_oauth_user_${state.user.id}`,
+              'true'
+            )
+            console.log(
+              'Google OAuth: Marked user as Google OAuth user in localStorage'
+            )
           }
-          
+
           // Always save auth state with token, even if user is not loaded yet
           saveAuthState(action.payload.data.token)
-          console.log('Google OAuth: Auth state saved to localStorage and cookies')
+          console.log(
+            'Google OAuth: Auth state saved to localStorage and cookies'
+          )
           window.dispatchEvent(new CustomEvent('AUTH_CHANGED_EVENT'))
         }
       })
@@ -1004,7 +1040,7 @@ const authSlice = createSlice({
         state.error = action.payload || 'Google login failed'
       })
       // Email verification cases
-      .addCase(verifyEmailCode.pending, (state) => {
+      .addCase(verifyEmailCode.pending, state => {
         state.isLoading = true
         state.error = null
       })
@@ -1016,8 +1052,14 @@ const authSlice = createSlice({
             saveAuthState(state.token)
             // Also save to localStorage for persistent verification status
             if (typeof window !== 'undefined') {
-              localStorage.setItem(`email_verified_${state.user.id}`, JSON.stringify(true))
-              console.log('AuthSlice: Saved email verification status to localStorage for user:', state.user.id)
+              localStorage.setItem(
+                `email_verified_${state.user.id}`,
+                JSON.stringify(true)
+              )
+              console.log(
+                'AuthSlice: Saved email verification status to localStorage for user:',
+                state.user.id
+              )
             }
           }
         }
@@ -1027,19 +1069,24 @@ const authSlice = createSlice({
         state.error = action.payload || 'Email verification failed'
       })
       // Change password cases
-      .addCase(changePassword.pending, (state) => {
+      .addCase(changePassword.pending, state => {
         state.isLoading = true
         state.error = null
       })
       .addCase(changePassword.fulfilled, (state, action) => {
         state.isLoading = false
-        
+
         // Mark that user has set a login password before logging out
         if (state.user?.id && typeof window !== 'undefined') {
-          localStorage.setItem(`has_set_login_password_${state.user.id}`, 'true')
-          console.log('Password changed successfully - marked user as having set login password before')
+          localStorage.setItem(
+            `has_set_login_password_${state.user.id}`,
+            'true'
+          )
+          console.log(
+            'Password changed successfully - marked user as having set login password before'
+          )
         }
-        
+
         // Force logout after successful password change
         state.user = null
         state.token = null
@@ -1059,19 +1106,24 @@ const authSlice = createSlice({
         state.error = action.payload || 'Password change failed'
       })
       // Set password cases (for Google OAuth users)
-      .addCase(setPassword.pending, (state) => {
+      .addCase(setPassword.pending, state => {
         state.isLoading = true
         state.error = null
       })
       .addCase(setPassword.fulfilled, (state, action) => {
         state.isLoading = false
-        
+
         // Mark that user has set a login password before logging out
         if (state.user?.id && typeof window !== 'undefined') {
-          localStorage.setItem(`has_set_login_password_${state.user.id}`, 'true')
-          console.log('Password set successfully - marked user as having set login password before')
+          localStorage.setItem(
+            `has_set_login_password_${state.user.id}`,
+            'true'
+          )
+          console.log(
+            'Password set successfully - marked user as having set login password before'
+          )
         }
-        
+
         // Force logout after successful password setting
         state.user = null
         state.token = null
@@ -1091,7 +1143,7 @@ const authSlice = createSlice({
         state.error = action.payload || 'Password setting failed'
       })
       // TON Login cases
-      .addCase(tonLogin.pending, (state) => {
+      .addCase(tonLogin.pending, state => {
         state.isLoading = true
         state.tonAuthStatus = 'loading'
         state.error = null
@@ -1100,7 +1152,7 @@ const authSlice = createSlice({
         state.isLoading = false
         state.tonAuthStatus = 'succeeded'
         state.error = null
-        
+
         if (action.payload) {
           state.user = action.payload.user
           state.token = action.payload.token
@@ -1134,10 +1186,12 @@ export const {
 // Clean conditional logic based on provider and verification status
 const shouldShowEmailVerificationButtons = (user: User | null): boolean => {
   if (!user) {
-    console.log('shouldShowEmailVerificationButtons - No user data, showing buttons')
+    console.log(
+      'shouldShowEmailVerificationButtons - No user data, showing buttons'
+    )
     return true // Show buttons if no user data
   }
-  
+
   const isGoogleUser = isGoogleOAuthUser(user)
   console.log('shouldShowEmailVerificationButtons - User check:', {
     userId: user.id,
@@ -1145,27 +1199,38 @@ const shouldShowEmailVerificationButtons = (user: User | null): boolean => {
     provider: user.provider,
     isVerified: user.isVerified,
     isGoogleUser,
-    hasWithdrawPassword: user.hasWithdrawPassword
+    hasWithdrawPassword: user.hasWithdrawPassword,
   })
-  
+
   // Hide buttons if user is Google OAuth (already verified by Google)
   if (isGoogleUser) {
-    console.log('shouldShowEmailVerificationButtons - Google OAuth user detected, hiding buttons')
+    console.log(
+      'shouldShowEmailVerificationButtons - Google OAuth user detected, hiding buttons'
+    )
     return false
   }
-  
+
   // Hide buttons if email is already verified
   if (user.isVerified) {
-    console.log('shouldShowEmailVerificationButtons - Email already verified, hiding buttons')
+    console.log(
+      'shouldShowEmailVerificationButtons - Email already verified, hiding buttons'
+    )
     return false
   }
-  
+
   // Show buttons for unverified email/password users
-  console.log('shouldShowEmailVerificationButtons - Showing buttons for unverified user')
+  console.log(
+    'shouldShowEmailVerificationButtons - Showing buttons for unverified user'
+  )
   return true
 }
 
 // Export helper functions for detecting Google OAuth users and password setting logic
-export { isGoogleOAuthUser, shouldUseSetPassword, shouldShowEmailVerificationButtons, canSetWithdrawalPassword }
+export {
+  isGoogleOAuthUser,
+  shouldUseSetPassword,
+  shouldShowEmailVerificationButtons,
+  // canSetWithdrawalPassword,
+}
 
 export default authSlice.reducer

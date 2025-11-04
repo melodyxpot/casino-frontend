@@ -32,7 +32,7 @@ const TelegramLogin: React.FC<TelegramLoginProps> = ({ onSuccess, onError }) => 
       script.async = true
       script.setAttribute('data-telegram-login', 'ok777_casino_bot')
       script.setAttribute('data-size', 'large')
-      script.setAttribute('data-auth-url', 'http://localhost:4000/auth/telegram/callback')
+      script.setAttribute('data-auth-url', `${process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000'}/auth/telegram/callback`)
       script.setAttribute('data-request-access', 'write')
       
       scriptRef.current = script
@@ -70,7 +70,7 @@ const TelegramLogin: React.FC<TelegramLoginProps> = ({ onSuccess, onError }) => 
     setIsLoading(true)
     
     // Redirect to Telegram login widget
-    const telegramLoginUrl = `https://oauth.telegram.org/auth?bot_id=ok777_casino_bot&origin=${encodeURIComponent(window.location.origin)}&return_to=${encodeURIComponent('http://localhost:4000/auth/telegram/callback')}`
+    const telegramLoginUrl = `https://oauth.telegram.org/auth?bot_id=ok777_casino_bot&origin=${encodeURIComponent(window.location.origin)}&return_to=${encodeURIComponent(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000'}/auth/telegram/callback`)}`
     window.location.href = telegramLoginUrl
   }
 

@@ -1,8 +1,7 @@
-import { 
-  API_BASE_URL, 
-  API_ENDPOINTS, 
-  ApiResponse, 
-  ApiError,
+import {
+  API_BASE_URL,
+  API_ENDPOINTS,
+  ApiResponse,
   SignupRequest,
   SignupResponse,
   LoginRequest,
@@ -14,7 +13,7 @@ import {
   ExchangeCurrencyRequest,
   ExchangeCurrencyResponse,
   FetchTransactionsRequest,
-  FetchTransactionsResponse
+  FetchTransactionsResponse,
 } from '../types/api'
 import { validateJWT } from './jwt'
 import { apiGet, apiPost } from './axios'
@@ -48,7 +47,7 @@ class ApiService {
     } else if (validation.isExpired) {
       console.warn('Setting expired token:', validation.error)
     }
-    
+
     this.defaultHeaders['Authorization'] = `${token}`
   }
 
@@ -112,9 +111,12 @@ class ApiService {
   }
 
   async refreshToken(): Promise<{ token: string; user: User }> {
-    return this.request<{ token: string; user: User }>(API_ENDPOINTS.REFRESH_TOKEN, {
-      method: 'POST',
-    })
+    return this.request<{ token: string; user: User }>(
+      API_ENDPOINTS.REFRESH_TOKEN,
+      {
+        method: 'POST',
+      }
+    )
   }
 
   async forgotPassword(email: string): Promise<ApiResponse> {
@@ -153,18 +155,28 @@ class ApiService {
   }
 
   async getTransactions(params?: any): Promise<{ transactions: any[] }> {
-    const queryString = params ? `?${new URLSearchParams(params).toString()}` : ''
-    return this.request<{ transactions: any[] }>(`${API_ENDPOINTS.TRANSACTIONS}${queryString}`, {
-      method: 'GET',
-    })
+    const queryString = params
+      ? `?${new URLSearchParams(params).toString()}`
+      : ''
+    return this.request<{ transactions: any[] }>(
+      `${API_ENDPOINTS.TRANSACTIONS}${queryString}`,
+      {
+        method: 'GET',
+      }
+    )
   }
 
   // Game Methods
   async getGames(params?: any): Promise<{ games: any[] }> {
-    const queryString = params ? `?${new URLSearchParams(params).toString()}` : ''
-    return this.request<{ games: any[] }>(`${API_ENDPOINTS.GAMES}${queryString}`, {
-      method: 'GET',
-    })
+    const queryString = params
+      ? `?${new URLSearchParams(params).toString()}`
+      : ''
+    return this.request<{ games: any[] }>(
+      `${API_ENDPOINTS.GAMES}${queryString}`,
+      {
+        method: 'GET',
+      }
+    )
   }
 
   async getGameProviders(): Promise<{ providers: any[] }> {
@@ -181,10 +193,15 @@ class ApiService {
   }
 
   async getBetHistory(params?: any): Promise<{ bets: any[] }> {
-    const queryString = params ? `?${new URLSearchParams(params).toString()}` : ''
-    return this.request<{ bets: any[] }>(`${API_ENDPOINTS.BET_HISTORY}${queryString}`, {
-      method: 'GET',
-    })
+    const queryString = params
+      ? `?${new URLSearchParams(params).toString()}`
+      : ''
+    return this.request<{ bets: any[] }>(
+      `${API_ENDPOINTS.BET_HISTORY}${queryString}`,
+      {
+        method: 'GET',
+      }
+    )
   }
 
   // Promotion Methods
@@ -195,9 +212,12 @@ class ApiService {
   }
 
   async claimBonus(bonusId: string): Promise<ApiResponse> {
-    return this.request<ApiResponse>(`${API_ENDPOINTS.CLAIM_BONUS}/${bonusId}`, {
-      method: 'POST',
-    })
+    return this.request<ApiResponse>(
+      `${API_ENDPOINTS.CLAIM_BONUS}/${bonusId}`,
+      {
+        method: 'POST',
+      }
+    )
   }
 
   // Support Methods
@@ -215,27 +235,44 @@ class ApiService {
   }
 
   // Email Verification Methods
-  async verifyEmailCode(data: VerifyEmailCodeRequest): Promise<VerifyEmailCodeResponse> {
-    return this.request<VerifyEmailCodeResponse>(API_ENDPOINTS.VERIFY_EMAIL_CODE, {
-      method: 'POST',
-      body: data,
-    })
+  async verifyEmailCode(
+    data: VerifyEmailCodeRequest
+  ): Promise<VerifyEmailCodeResponse> {
+    return this.request<VerifyEmailCodeResponse>(
+      API_ENDPOINTS.VERIFY_EMAIL_CODE,
+      {
+        method: 'POST',
+        body: data,
+      }
+    )
   }
 
   // Currency Exchange Methods
-  async exchangeCurrency(data: ExchangeCurrencyRequest): Promise<ExchangeCurrencyResponse> {
-    return this.request<ExchangeCurrencyResponse>(API_ENDPOINTS.EXCHANGE_CURRENCY, {
-      method: 'POST',
-      body: data,
-    })
+  async exchangeCurrency(
+    data: ExchangeCurrencyRequest
+  ): Promise<ExchangeCurrencyResponse> {
+    return this.request<ExchangeCurrencyResponse>(
+      API_ENDPOINTS.EXCHANGE_CURRENCY,
+      {
+        method: 'POST',
+        body: data,
+      }
+    )
   }
 
   // Transaction Methods
-  async fetchTransactions(params: FetchTransactionsRequest): Promise<FetchTransactionsResponse> {
-    const queryString = new URLSearchParams({ currency: params.currency }).toString()
-    return this.request<FetchTransactionsResponse>(`${API_ENDPOINTS.TRANSACTIONS}?${queryString}`, {
-      method: 'GET',
-    })
+  async fetchTransactions(
+    params: FetchTransactionsRequest
+  ): Promise<FetchTransactionsResponse> {
+    const queryString = new URLSearchParams({
+      currency: params.currency,
+    }).toString()
+    return this.request<FetchTransactionsResponse>(
+      `${API_ENDPOINTS.TRANSACTIONS}?${queryString}`,
+      {
+        method: 'GET',
+      }
+    )
   }
 }
 

@@ -1,21 +1,26 @@
 import React, { useState } from 'react'
-import EditIcon from '@/components/ui/icons/edit'
 import TDButton from '@/components/ui/Button/TDButton'
-import { Input } from '@/components/ui'
 import FlatButton from '@/components/ui/Button/FlatButton'
 import ModalContainer from '@/components/modals/ModalContainer'
 import LockKeyholeIcon from '@/components/ui/icons/lock-keyhole'
 import CheckIcon from '@/components/ui/icons/check'
 import XIcon from '@/components/ui/icons/x'
 import EnvelopeIcon from '@/components/ui/icons/envelope'
-import MobileIcon from '@/components/ui/icons/mobile'
-import { LabeledInput } from '@/components/ui/LabeledInput'
 import EyeSlashIcon from '@/components/ui/icons/eye-slash'
 import EyeIcon from '@/components/ui/icons/eye'
 import CheckCircleIcon from '@/components/ui/icons/check-circle'
-import TelegramIcon from '@/components/ui/icons/TelegramIcon'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
-import { setWithdrawPassword, requestEmailVerification, verifyEmailCode, changePassword, setPassword, isGoogleOAuthUser, shouldUseSetPassword, shouldShowEmailVerificationButtons, canSetWithdrawalPassword } from '@/store/slices/authSlice'
+import { 
+  setWithdrawPassword, 
+  requestEmailVerification, 
+  verifyEmailCode, 
+  changePassword, 
+  setPassword, 
+  isGoogleOAuthUser, 
+  shouldUseSetPassword, 
+  shouldShowEmailVerificationButtons, 
+  // canSetWithdrawalPassword
+} from '@/store/slices/authSlice'
 import { setEmailVerified, setWithdrawPasswordSet } from '@/store/slices/userSettingsSlice'
 import { useToast } from '@/context/ToastProvider'
 import { validatePassword } from '@/lib/validation'
@@ -37,7 +42,7 @@ const Security: React.FC = () => {
   // Detect if user should use set-password (no old password) vs change-password (requires old password)
   const shouldUseSetPasswordMode = shouldUseSetPassword(user)
   // Check if user can set/change withdrawal password (requires login password to exist)
-  const canSetWithdrawPassword = canSetWithdrawalPassword(user)
+  // const canSetWithdrawPassword = canSetWithdrawalPassword(user)
   // Clean conditional logic for email verification buttons
   const showEmailVerificationButtons = shouldShowEmailVerificationButtons(user)
   
@@ -48,22 +53,6 @@ const Security: React.FC = () => {
   const withdrawPasswordSet = user?.id ? withdrawPasswordSetState[user.id as number] ?? !!user?.hasWithdrawPassword : false
 
   const [emailSendCooldown, setEmailSendCooldown] = useState<number>(0)
-
-  // Debug logging
-  console.log('Security - Email verification status:', {
-    userId: user?.id,
-    email: user?.email,
-    provider: user?.provider,
-    isGoogleUser,
-    userIsVerified: user?.isVerified,
-    emailVerified,
-    showEmailVerificationButtons,
-    hasWithdrawPassword: user?.hasWithdrawPassword,
-    canSetWithdrawPassword,
-    shouldUseSetPasswordMode,
-    hasUser: !!user,
-    userObject: user
-  })
 
   React.useEffect(() => {
     if (emailSendCooldown <= 0) return
@@ -239,7 +228,7 @@ const Security: React.FC = () => {
       onClick: togglePasswordModal,
     },
     // Only show withdrawal password section if user can set it (has login password)
-    ...(canSetWithdrawPassword ? [{
+    ...(user?.hasPassword ? [{
       title: 'Withdrawal Password',
       icon: <LockKeyholeIcon />,
       state: withdrawPasswordSet ? 'ok' : 'no',

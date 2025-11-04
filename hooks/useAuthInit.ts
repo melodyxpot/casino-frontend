@@ -10,21 +10,22 @@ import { fetchProfile } from '@/store/slices/authSlice'
  */
 export const useAuthInit = () => {
   const dispatch = useAppDispatch()
-  const { token, user, isAuthenticated, isLoading } = useAppSelector(state => state.auth)
+  const { token, user, isAuthenticated, isLoading } = useAppSelector(
+    state => state.auth
+  )
 
   useEffect(() => {
     // Only run on client side
     if (typeof window === 'undefined') return
 
-    // If we have a token but no user data, fetch the profile
-    if (token && !user && !isLoading) {
-      console.log('AuthInit: Token found but no user data, fetching profile...')
+    // If we have a token, always fetch fresh profile on first page load
+    if (token && isAuthenticated && !isLoading) {
       dispatch(fetchProfile())
     }
-  }, [dispatch, token, user, isLoading])
+  }, [dispatch, token, isAuthenticated, isLoading])
 
   return {
-    isInitialized: !token || (token && user) || isLoading
+    isInitialized: !token || (token && user) || isLoading,
   }
 }
 

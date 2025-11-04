@@ -1,10 +1,10 @@
 import { API_ENDPOINTS } from '@/types/api'
-import { 
-  MetaMaskNonceRequest, 
-  MetaMaskNonceResponse, 
-  MetaMaskVerifyRequest, 
+import {
+  MetaMaskNonceRequest,
+  MetaMaskNonceResponse,
+  MetaMaskVerifyRequest,
   MetaMaskVerifyResponse,
-  MetaMaskProfileResponse 
+  MetaMaskProfileResponse,
 } from '@/types/api'
 
 // Extend Window interface to include ethereum
@@ -29,7 +29,8 @@ export class MetaMaskService {
   private apiBaseUrl: string
 
   constructor() {
-    this.apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.ok777.io'
+    this.apiBaseUrl =
+      process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.ok777.io'
     console.log('MetaMaskService initialized with API URL:', this.apiBaseUrl)
   }
 
@@ -62,7 +63,7 @@ export class MetaMaskService {
       isCoinbaseWallet,
       isBraveWallet,
       providers: window.ethereum.providers?.length || 0,
-      ethereumKeys: Object.keys(window.ethereum)
+      ethereumKeys: Object.keys(window.ethereum),
     })
 
     // Simple detection: if MetaMask is true, consider it available
@@ -81,16 +82,16 @@ export class MetaMaskService {
     try {
       // Try to connect specifically to MetaMask
       let accounts
-      
+
       // First, try to get accounts without requesting permissions
       try {
         accounts = await window.ethereum!.request({
-          method: 'eth_accounts'
+          method: 'eth_accounts',
         })
       } catch (e) {
         // If that fails, request accounts (this will trigger wallet selection)
         accounts = await window.ethereum!.request({
-          method: 'eth_requestAccounts'
+          method: 'eth_requestAccounts',
         })
       }
 
@@ -113,20 +114,23 @@ export class MetaMaskService {
    */
   async requestNonce(address: string): Promise<string> {
     try {
-      const response = await fetch(`${this.apiBaseUrl}${API_ENDPOINTS.METAMASK_NONCE}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ address } as MetaMaskNonceRequest),
-      })
+      const response = await fetch(
+        `${this.apiBaseUrl}${API_ENDPOINTS.METAMASK_NONCE}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ address } as MetaMaskNonceRequest),
+        }
+      )
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
       const data: MetaMaskNonceResponse = await response.json()
-      
+
       if (data.code !== 200) {
         throw new Error(data.message || 'Failed to get nonce')
       }
@@ -163,22 +167,28 @@ export class MetaMaskService {
   /**
    * Verify the signature with the backend
    */
-  async verifySignature(address: string, signature: string): Promise<{ token: string; user: any }> {
+  async verifySignature(
+    address: string,
+    signature: string
+  ): Promise<{ token: string; user: any }> {
     try {
-      const response = await fetch(`${this.apiBaseUrl}${API_ENDPOINTS.METAMASK_VERIFY}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ address, signature } as MetaMaskVerifyRequest),
-      })
+      const response = await fetch(
+        `${this.apiBaseUrl}${API_ENDPOINTS.METAMASK_VERIFY}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ address, signature } as MetaMaskVerifyRequest),
+        }
+      )
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
       const data: MetaMaskVerifyResponse = await response.json()
-      
+
       if (data.code !== 200) {
         throw new Error(data.message || 'Failed to verify signature')
       }
@@ -194,20 +204,23 @@ export class MetaMaskService {
    */
   async getProfile(token: string): Promise<MetaMaskProfileResponse['data']> {
     try {
-      const response = await fetch(`${this.apiBaseUrl}${API_ENDPOINTS.METAMASK_PROFILE}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
+      const response = await fetch(
+        `${this.apiBaseUrl}${API_ENDPOINTS.METAMASK_PROFILE}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      )
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
       const data: MetaMaskProfileResponse = await response.json()
-      
+
       if (data.code !== 200) {
         throw new Error(data.message || 'Failed to get profile')
       }

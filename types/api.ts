@@ -1,6 +1,6 @@
 // API Base Configuration
-export const API_BASE_URL = 'https://api.ok777.io'
-
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.ok777.io'
 
 // Common API Response Structure
 export interface ApiResponse<T = any> {
@@ -29,6 +29,7 @@ export interface User {
   avatar?: string
   isVerified?: boolean
   hasWithdrawPassword?: boolean
+  hasPassword?: boolean // Whether user has set a login password
   provider?: string // 'google', 'email', etc.
   createdAt?: string
   updatedAt?: string
@@ -147,11 +148,11 @@ export const API_ENDPOINTS = {
   FORGOT_PASSWORD: '/api/v1/users/forgot-password',
   RESET_PASSWORD: '/api/v1/users/reset-password',
   VERIFY_EMAIL_CODE: '/api/v1/users/confirm-email-code',
-  
+
   // User Profile
   PROFILE: '/api/v1/users/profile',
   UPDATE_PROFILE: '/api/v1/users/profile',
-  
+
   // Wallet
   WALLET: '/api/v1/wallet',
   TRANSACTIONS: '/api/v1/wallet/transactions',
@@ -160,21 +161,21 @@ export const API_ENDPOINTS = {
   EXCHANGE_CURRENCY: '/api/v1/wallets/exchange',
   WALLET_BETS: '/api/v1/wallets/bets',
   WALLET_WITHDRAW: '/api/v1/wallets/withdraw',
-  
+
   // Games
   GAMES: '/api/v1/games',
   GAME_PROVIDERS: '/api/v1/games/providers',
   PLACE_BET: '/api/v1/games/bet',
   BET_HISTORY: '/api/v1/games/bets',
-  
+
   // Promotions
   PROMOTIONS: '/api/v1/promotions',
   CLAIM_BONUS: '/api/v1/promotions/claim',
-  
+
   // Support
   TICKETS: '/api/v1/support/tickets',
   CREATE_TICKET: '/api/v1/support/tickets',
-  
+
   // Referrals
   REFERRAL_INFO: '/api/v1/users/referal-info',
   SET_TELEGRAM: '/api/v1/users/set-telegram',
@@ -187,7 +188,7 @@ export const API_ENDPOINTS = {
   SET_PASSWORD: '/api/v1/users/set-password',
   GOOGLE_OAUTH_CALLBACK: '/api/v1/users/auth/google/callback',
   WALLET_INFO: '/api/v1/wallets/info',
-  
+
   // MetaMask Authentication
   METAMASK_NONCE: '/api/v1/users/auth/nonce',
   METAMASK_VERIFY: '/api/v1/users/auth/verify',
@@ -233,6 +234,7 @@ export interface ProfileResponse {
     avatar?: string
     isVerified?: boolean
     email_verified?: boolean // Backend field name
+    hasPassword?: boolean
   }
 }
 
